@@ -1,0 +1,91 @@
+// 1. Compter le nombre total de films dans la collection.
+var mf = function () {emit("count",1)}
+var rf = function (k,v) {return Array.sum(v)}
+db.films.mapReduce(mf,rf,{out:"res"})
+db.res.find()
+
+// 2. Compter le nombre de films par genre.
+var mf = function () {emit(this.genre,1)}
+var rf = function (k,v) {return Array.sum(v)}
+db.films.mapReduce(mf,rf,{out:"res"})
+db.res.find()
+
+// 3. Compter le nombre de films réalisés par chaque réalisateur.
+var mf = function () {emit(this.director._id,1)}
+var rf = function (k,v) {return Array.sum(v)}
+db.films.mapReduce(mf,rf,{out:"res"})
+db.res.find()
+
+// 4. Compter le nombre d’acteurs uniques apparaissant dans tous les films.
+// L'unicité est faite par le mapReduce. Comme on n'a pas de clé pour les acteurs, on choisit ici nom+prénom en clé.
+var mf=function(){if(!this.actors)return; this.actors.forEach((a)=>{emit(a.last_name+" "+a.first_name,1)})}
+var rf = function (k,v) {return 1}
+db.films.mapReduce(mf,rf,{out:"res"})
+db.res.find()
+
+// 5. Lister le nombre de films par année de sortie.
+var mf = function () {emit(this.year,1)}
+var rf = function (k,v) {return Array.sum(v)}
+db.films.mapReduce(mf,rf,{out:"res"})
+db.res.find()
+
+// 6. Calculer la note moyenne par film à partir du tableau grades.
+var mf=function(){this.grades.forEach((g)=>(emit(this._id,g.note)))}
+var rf=function(k,v){return Array.sum(v)/v.length}
+db.films.mapReduce(mf,rf,{out:"res"})
+db.res.find()
+
+// 7. Calculer la note moyenne par genre.
+var mf=function(){this.grades.forEach((g)=>(emit(this.genre,g.note)))}
+var rf=function(k,v){return Array.sum(v)/v.length}
+db.films.mapReduce(mf,rf,{out:"res"})
+db.res.find()
+
+// 8. Calculer la note moyenne par réalisateur.
+var mf=function(){this.grades.forEach((g)=>(emit(this.director._id,g.note)))}
+var rf=function(k,v){return Array.sum(v)/v.length}
+db.films.mapReduce(mf,rf,{out:"res"})
+db.res.find()
+
+// 9. Trouver le film avec la note maximale la plus élevée.
+// En deux temps: max par film (mapreduce) puis max global (.sort décroissant, suffit le lire le 1er)
+var mf=function(){this.grades.forEach((g)=>emit(this._id,g.note))}
+var rf=function(k,v){return Math.max.apply(null,v)}
+db.films.mapReduce(mf,rf,{out:"res"})
+db.res.find().sort({value:-1})
+
+// 10. Compter le nombre de notes supérieures à 70 dans tous les films.
+var mf=function(){this.grades.forEach((g)=>emit(this._id,g.note))}
+var rf=function(k,v){return v.reduce((total,x) => (x > 70 ? total+1 : total),0)}
+db.films.mapReduce(mf,rf,{out:"res"})
+db.res.find()
+
+// 11. Lister tous les acteurs par genre, sans doublons.
+var mf=function(){if(!this.actors)return; this.actors.forEach((a)=>{emit(this.genre,a.last_name+" "+a.first_name)})}
+var rf=function(k,v){return [... new Set(v)]} // Supprime les entrées en double
+db.films.mapReduce(mf,rf,{out:"res"})
+db.res.find()
+
+// 12. Trouver les acteurs apparaissant dans le plus grand nombre de films.
+var mf=function(){if(!this.actors)return; this.actors.forEach((a)=>{emit(a.last_name+" "+a.first_name,1)})}
+var rf=function(k,v){return Array.sum(v)}
+db.films.mapReduce(mf,rf,{out:"res"})
+db.res.find().sort({value:-1})
+
+// 13. Classer les films par lettre de grade majoritaire ( A , B , C , etc.)
+var mf=function(){var gc = {};this.grades.forEach((g)=>(gc[g.grade] = (gc[g.grade] || 0)+1));m=-Infinity;dg="?";for([k,v] of Object.entries(gc)){if(v>m){m=v;dg=k}}emit(dg,this.title)}
+var rf=function(k,v){return v}
+db.films.mapReduce(mf,rf,{out:"res"})
+db.res.find()
+
+// 14. Calculer la note moyenne par année de sortie des films.
+var mf=function(){this.grades.forEach((g)=>emit(this.year,g.note))}
+var rf=function(k,v){return Array.sum(v)/v.length}
+db.films.mapReduce(mf,rf,{out:"res"})
+db.res.find()
+
+// 15. Identifier les réalisateurs dont la note moyenne de tous leurs films est supérieure à 80.
+var mf=function(){this.grades.forEach((g)=>emit(this.director._id,g.note))}
+var rf=function(k,v){return Array.sum(v)/v.length}
+db.films.mapReduce(mf,rf,{out:"res"})
+db.res.find({value:{$gte:80}})
